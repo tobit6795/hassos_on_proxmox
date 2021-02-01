@@ -1,0 +1,49 @@
+###############################################################################################
+#                                      -General Options-                                      #
+###############################################################################################
+# These parameters are required.                                                              #
+###############################################################################################
+
+# qcow2 image to use for your Virtual Machines:
+vmdk_image: 'https://github.com/home-assistant/operating-system/releases/download/5.11/hassos_ova-5.11.vmdk.xz'
+# Location to use for storing the qcow2 image. Be sure to end the absolute path with a '/'.
+vmdk_download_location: '/tmp/'
+
+# Resource Pool for your virtual machines.
+resource_pool: 'HA'
+
+# VM IDs
+#vm_id: '1023'
+
+# Hostnames
+vm_hn: 'hassos'
+
+# Number of CPUs
+vm_cpu: '2'
+
+# Amount of memory expressed in megabytes
+vm_mem: '4096'
+
+# Disk Sizes
+vm_size: '30G'
+
+# IP Addresses
+vm_ip: '10.10.0.254'
+
+# Subnet Sizes
+vm_sn: '/23'
+
+# Network Gateway
+vm_gw: '10.10.0.1'
+
+# DNS Servers
+vm_ns: '10.10.0.1'
+
+# Search Domains
+vm_sd: 'fritz.box'
+
+# Network Bridges
+vm_bridge: 'vmbr0'
+
+# Storage volumes
+vm_stg: 'local-lvm'

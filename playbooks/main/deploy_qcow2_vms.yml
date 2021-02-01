@@ -1,0 +1,92 @@
+---
+- hosts: proxmox 
+  gather_facts: False
+  vars:
+    id_list:
+        - "{{ vm_id }}"
+    id_stg_list:
+        - { id: "{{ vm_id }}", stg: "{{ vm_stg }}" }
+  tasks:
+      - name: Including the variables.
+        include_vars:
+            file: ../../vars.yml
+
+      - name: Creating a resource pool.
+        shell: pvesh create /pools -poolid "{{ resource_pool }}" --Comment "{{ resource_pool }}"
+        ignore_errors: yes
+
+      - name: check if image already exists
+        stat:
+          path: "{{ vmdk_download_location }}hassos.vmdk.xz"
+        register: file
+
+      - name: Downloading the Debian vmdk image.
+        get_url:
+            url: "{{ vmdk_image }}"
+            dest: "{{ vmdk_download_location }}hassos.vmdk.xz"
+        changed_when: false
+        register: image
+        when: not file.stat.exists
+
+      - name: Unarchive a file that needs to be downloaded
+        shell: "xz -d {{ vmdk_download_location }}hassos.vmdk.xz"
+        args:
+          chdir: "{{ vmdk_download_location }}"
+          creates: "{{ vmdk_download_location }}hassos.vmdk"
+        #when: image is changed
+
+      - name: get next VM ID
+        shell: pvesh get /cluster/nextid
+        register: next_vm_id
+        when: vm_id is not defined or vm_id == ""
+        check_mode: no
+        changed_when: false
+
+      - set_fact:
+          vm_id: "{{ next_vm_id.stdout }}"
+        when: vm_id is not defined or vm_id == ""
+        check_mode: no
+
+      - name: Creating the VMs.
+        shell: >
+            qm create {{ item.id }}
+            --pool {{ resource_pool }}
+            --name {{ item.hn }}
+            --description "{{ inventory_hostname }} VM"
+            --agent 1
+            --bios ovmf
+            --cores {{ item.cpu }}
+            --memory {{ item.mem }}
+            --net0 "virtio,bridge={{ item.bridge }}"
+            --ipconfig0 "gw={{ item.gw }},ip={{ item.ip }}{{ item.sn }}"
+            --nameserver {{ item.ns }}
+            --searchdomain {{ item.sd }}
+            --cipassword {{ password }}
+            --onboot 1
+            --ostype "l26"
+            --scsihw virtio-scsi-pci
+        with_items:
+            - { id: "{{ vm_id }}", hn: "{{ vm_hn }}", cpu: "{{ vm_cpu }}", mem: "{{ vm_mem }}", bridge: "{{ vm_bridge }}", gw: "{{ vm_gw }}", ip: "{{ vm_ip }}", sn: "{{ vm_sn }}", ns: "{{ vm_ns }}", sd: "{{ vm_sd }}" }
+
+      - name: alloc disk
+        shell: "pvesm alloc {{ item.stg }} {{ item.id }} vm-{{ item.id }}-disk-0 128" 
+        with_items: "{{ id_stg_list }}"
+
+      - name: Importing the vmdk image as a disk.
+        shell: qm importdisk {{ item.id }} "{{ vmdk_download_location }}hassos.vmdk" {{ item.stg }} -format vmdk
+        with_items: "{{ id_stg_list }}"
+
+      - name: Configuring the VM Hardware.
+        shell: qm set {{ item.id }}
+               -efidisk0 {{ item.stg }}:vm-{{ item.id }}-disk-0,size=128K
+               -sata0 {{ item.stg }}:vm-{{ item.id }}-disk-1,size={{ vm_size }}
+               -serial0 /dev/tty0
+        with_items: "{{ id_stg_list }}"
+
+      - name: Configuring Boot Order.
+        shell: qm set {{ item.id }} -boot order=sata0
+        with_items: "{{ id_stg_list }}"
+
+      - name: Starting the VMs.
+        shell: qm start {{ item }}
+        with_items: "{{ id_list }}"

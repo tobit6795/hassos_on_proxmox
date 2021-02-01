@@ -1,0 +1,7 @@
+#!/usr/bin/env ansible-playbook
+
+- import_playbook: playbooks/optional/delete_all_resources.yml 
+  when: remove_vm|default(false)|bool == true  
+
+- import_playbook: playbooks/main/deploy_qcow2_vms.yml 
+  tags: proxmox
